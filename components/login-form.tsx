@@ -47,6 +47,26 @@ export function LoginForm({
     }
   };
 
+  const handleGoogleLogin = async () => {
+    const supabase = createClient();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+      // no router.push here — OAuth redirects away
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "An error occurred");
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -59,6 +79,46 @@ export function LoginForm({
         <CardContent>
           <form onSubmit={handleLogin}>
             <div className="flex flex-col gap-6">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2"
+              onClick={handleGoogleLogin}
+              disabled={isLoading}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 48 48"
+                className="h-5 w-5"
+              >
+                <path
+                  fill="#FFC107"
+                  d="M43.6 20.5H42V20H24v8h11.3C33.8 32.7 29.4 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C33.9 6.5 29.2 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c10 0 19-7 19-20 0-1.3-.1-2.7-.4-3.5z"
+                />
+                <path
+                  fill="#FF3D00"
+                  d="M6.3 14.7l6.6 4.8C14.6 16.2 19 12 24 12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C33.9 6.5 29.2 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"
+                />
+                <path
+                  fill="#4CAF50"
+                  d="M24 44c5.3 0 10.2-2 13.9-5.3l-6.4-5.2C29.4 35.5 26.8 36 24 36c-5.4 0-9.8-3.3-11.3-8l-6.6 5.1C9.6 39.7 16.3 44 24 44z"
+                />
+                <path
+                  fill="#1976D2"
+                  d="M43.6 20.5H42V20H24v8h11.3c-1 3-3.1 5.3-5.8 6.8l6.4 5.2C39.8 36.6 44 30.8 44 24c0-1.3-.1-2.7-.4-3.5z"
+                />
+              </svg>
+
+              Continue with Google
+            </Button>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">or</span>
+                </div>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
