@@ -174,9 +174,21 @@ export default function HomePage() {
         {/* Footer */}
         <footer className="border-t">
           <div className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-10 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
+            
             <div>© 2026 BibExchange</div>
+
+            <div className="flex gap-6">
+              <Link href="/terms" className="hover:text-foreground transition-colors">
+                Terms of Service
+              </Link>
+              <Link href="/privacy" className="hover:text-foreground transition-colors">
+                Privacy Policy
+              </Link>
+            </div>
+
           </div>
         </footer>
+
       </main>
     </div>
   );
