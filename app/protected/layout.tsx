@@ -48,37 +48,36 @@ async function HeaderAuth() {
   );
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function ProtectedLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-background antialiased">
-        <div className="flex min-h-screen flex-col">
-          {/* Auth header must be under Suspense */}
-          <Suspense
-            fallback={
-              <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
-                <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-                  <div className="flex items-center gap-2 font-semibold">
-                    <span className="text-xl">🏁</span>
-                    <span>BibExchange</span>
-                  </div>
-                  <div className="h-9 w-24" />
-                </div>
-              </header>
-            }
-          >
-            <HeaderAuth />
-          </Suspense>
-
-          <main className="flex-1">{children}</main>
-
-          <footer className="border-t">
-            <div className="mx-auto flex max-w-6xl items-center justify-center px-6 py-10 text-sm text-muted-foreground">
-              © 2026 BibExchange
+    <div className="flex min-h-screen flex-col">
+      <Suspense
+        fallback={
+          <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
+            <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+              <div className="flex items-center gap-2 font-semibold">
+                <span className="text-xl">🏁</span>
+                <span>BibExchange</span>
+              </div>
+              <div className="h-9 w-24" />
             </div>
-          </footer>
+          </header>
+        }
+      >
+        <HeaderAuth />
+      </Suspense>
+
+      <main className="flex-1">{children}</main>
+
+      <footer className="border-t">
+        <div className="mx-auto flex max-w-6xl items-center justify-center px-6 py-10 text-sm text-muted-foreground">
+          © 2026 BibExchange
         </div>
-      </body>
-    </html>
+      </footer>
+    </div>
   );
 }

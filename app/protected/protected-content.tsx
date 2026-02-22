@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -20,6 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+import JoinBuyerDialog from "./JoinBuyerDialog";
+import ListSellerDialog from "./ListSellerDialog";
 
 type BibRow = {
   id: number;
@@ -128,6 +130,196 @@ export default async function ProtectedContent() {
     redirect("/protected");
   }
 
+  async function joinBuyerQueue(
+    prev: { ok: boolean; message?: string },
+    formData: FormData
+  ) {
+    "use server";
+
+    const eventId = String(formData.get("event_id") || "");
+    if (!eventId) return { ok: false, message: "Please select an event." };
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect("/auth/login");
+
+    // 1) Can't buy & sell same event (active)
+    const { data: activeSell, error: sellErr } = await supabase
+      .from("sellers")
+      .select("id,status")
+      .eq("user_id", user.id)
+      .eq("event_id", eventId)
+      .in("status", ["waiting", "matched"])
+      .limit(1);
+
+    if (sellErr) console.error(sellErr);
+    if (activeSell && activeSell.length > 0) {
+      return {
+        ok: false,
+        message:
+          "You already have a SELL request for this event. Cancel it first if you want to join as a buyer.",
+      };
+    }
+
+    // already waiting for this event?
+    const { data: existingWaiting, error: exErr } = await supabase
+      .from("buyer_queue")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("event_id", eventId)
+      .eq("status", "waiting")
+      .limit(1);
+
+    if (exErr) console.error(exErr);
+    if (existingWaiting && existingWaiting.length > 0) {
+      return {
+        ok: false,
+        message: "You are already in the buyer queue for this event.",
+      };
+    }
+
+    // 2) If previously cancelled/expired, reactivate instead of insert (and push to end of line)
+    const { data: oldRow, error: oldErr } = await supabase
+      .from("buyer_queue")
+      .select("id,status")
+      .eq("user_id", user.id)
+      .eq("event_id", eventId)
+      .in("status", ["cancelled", "expired"])
+      .order("joined_at", { ascending: false })
+      .limit(1);
+
+    if (oldErr) console.error(oldErr);
+
+    if (oldRow && oldRow.length > 0) {
+      const { error: updErr } = await supabase
+        .from("buyer_queue")
+        .update({
+          status: "waiting",
+          joined_at: new Date().toISOString(), // put last in line
+        })
+        .eq("id", oldRow[0].id);
+
+      if (updErr) {
+        console.error(updErr);
+        return { ok: false, message: "Could not re-join the queue. Please try again." };
+      }
+
+      redirect("/protected");
+    }
+
+    // otherwise insert new
+    const { error } = await supabase.from("buyer_queue").insert({
+      user_id: user.id,
+      event_id: eventId,
+      status: "waiting",
+      joined_at: new Date().toISOString(), // ensure set (if db default exists, this is still fine)
+    });
+
+    if (error) {
+      console.error(error);
+      return { ok: false, message: "Could not join the queue. Please try again." };
+    }
+
+    redirect("/protected");
+  }
+
+  async function listMyBib(
+    prev: { ok: boolean; message?: string },
+    formData: FormData
+  ) {
+    "use server";
+
+    const eventId = String(formData.get("event_id") || "");
+    const ownerConfirmed = String(formData.get("owner_confirmed") || "");
+
+    if (!eventId) return { ok: false, message: "Please select an event." };
+    if (!ownerConfirmed) return { ok: false, message: "Please confirm you own the bib." };
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) redirect("/auth/login");
+
+    // 1) Can't buy & sell same event (active)
+    const { data: activeBuy, error: buyErr } = await supabase
+      .from("buyer_queue")
+      .select("id,status")
+      .eq("user_id", user.id)
+      .eq("event_id", eventId)
+      .in("status", ["waiting", "matched"])
+      .limit(1);
+
+    if (buyErr) console.error(buyErr);
+    if (activeBuy && activeBuy.length > 0) {
+      return {
+        ok: false,
+        message:
+          "You already have a BUY request for this event. Cancel it first if you want to list as a seller.",
+      };
+    }
+
+    // already waiting for this event?
+    const { data: existingWaiting, error: exErr } = await supabase
+      .from("sellers")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("event_id", eventId)
+      .eq("status", "waiting")
+      .limit(1);
+
+    if (exErr) console.error(exErr);
+    if (existingWaiting && existingWaiting.length > 0) {
+      return { ok: false, message: "You already listed a bib for this event." };
+    }
+
+    // 2) If previously cancelled/expired, reactivate instead of insert (and push to end of line)
+    const { data: oldRow, error: oldErr } = await supabase
+      .from("sellers")
+      .select("id,status")
+      .eq("user_id", user.id)
+      .eq("event_id", eventId)
+      .in("status", ["cancelled", "expired"])
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (oldErr) console.error(oldErr);
+
+    if (oldRow && oldRow.length > 0) {
+      const { error: updErr } = await supabase
+        .from("sellers")
+        .update({
+          status: "waiting",
+          created_at: new Date().toISOString(), // put last in line
+        })
+        .eq("id", oldRow[0].id);
+
+      if (updErr) {
+        console.error(updErr);
+        return { ok: false, message: "Could not re-list your bib. Please try again." };
+      }
+
+      redirect("/protected");
+    }
+
+    // otherwise insert new
+    const { error } = await supabase.from("sellers").insert({
+      user_id: user.id,
+      event_id: eventId,
+      status: "waiting",
+      created_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.error(error);
+      return { ok: false, message: "Could not list your bib. Please try again." };
+    }
+
+    redirect("/protected");
+  }
+
   const { data: buying, error: buyingErr } = await supabase
     .from("buyer_queue")
     .select("id,status,joined_at,events(name,distance_label)")
@@ -138,11 +330,25 @@ export default async function ProtectedContent() {
     .from("sellers")
     .select("id,status,created_at,events(name,distance_label)")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false });    
 
   if (buyingErr) console.error(buyingErr);
   if (sellingErr) console.error(sellingErr);
 
+  const { data: events, error: eventsErr } = await supabase
+    .from("events")
+    .select("id,name,distance_label")
+    .order("name", { ascending: true });
+
+  if (eventsErr) console.error(eventsErr);
+
+  const eventOptions =
+    (events ?? []).map((e: any) => ({
+      id: String(e.id),
+      name: String(e.name),
+      distance_label: e.distance_label ?? null,
+    }));
+  
   const rows: BibRow[] = [
     ...(buying ?? []).map((r: any) => ({
       id: r.id,
@@ -181,12 +387,15 @@ export default async function ProtectedContent() {
                   Start by joining a buyer queue or listing your bib to transfer.
                 </p>
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                  <Link href="/buy">
-                    <Button>Buy</Button>
-                  </Link>
-                  <Link href="/sell">
-                    <Button variant="outline">Sell</Button>
-                  </Link>
+                  <JoinBuyerDialog
+                    events={eventOptions}
+                    joinBuyerAction={joinBuyerQueue}
+                  />
+
+                  <ListSellerDialog
+                    events={eventOptions}
+                    listSellerAction={listMyBib}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -271,9 +480,10 @@ export default async function ProtectedContent() {
                 first served.
               </p>
               <div className="mt-5">
-                <Link href="/buy">
-                  <Button>Join buyer queue</Button>
-                </Link>
+                <JoinBuyerDialog
+                  events={eventOptions}
+                  joinBuyerAction={joinBuyerQueue}
+                />
               </div>
             </CardContent>
           </Card>
@@ -287,9 +497,10 @@ export default async function ProtectedContent() {
                 buyer automatically.
               </p>
               <div className="mt-5">
-                <Link href="/sell">
-                  <Button variant="outline">List my bib to transfer</Button>
-                </Link>
+                <ListSellerDialog
+                  events={eventOptions}
+                  listSellerAction={listMyBib}
+                />
               </div>
             </CardContent>
           </Card>
