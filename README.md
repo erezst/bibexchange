@@ -1,109 +1,285 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+# BibExchange
 
-<p align="center">
- The fastest way to build apps with Next.js and Supabase
-</p>
+BibExchange is a queue-based web platform that enables runners to **fairly exchange race bibs** for sold-out events.
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
-</p>
-<br/>
+When a seller can no longer participate in a race, the system matches them — in order — with a buyer from a waiting queue. The platform coordinates confirmations, manages expirations, and sends secure action links via email to ensure a transparent and fraud-resistant process.
 
-## Features
+---
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Proxy
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+## 🚀 Features
 
-## Demo
+* 🔐 **Authentication** via Supabase (email/password)
+* 🧾 **Seller listings** for specific race events
+* 🕒 **Buyer queue system** (first-come, first-served)
+* 🤝 **Automated matching engine**
+* ⏳ **Match expiration logic**
+* 🔁 **Pass / requeue functionality**
+* 📧 **Transactional email flow (Brevo)**
+* 🔒 **Signed action links (HMAC-based)**
+* ⏰ **Secure cron endpoints**
+* ☁️ Designed for **serverless deployment (Vercel)**
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+---
 
-## Deploy to Vercel
+## 🏗 Repository Structure
 
-Vercel deployment will guide you through creating a Supabase account and project.
+```
+app/
+  page.tsx                # Home page
+  auth/                   # Login, signup, password reset flows
+  api/
+    action/               # Buyer/Seller action endpoints
+    cron/                 # Scheduled backend jobs
+  action/                 # Client/server action pages (e.g. /action/done)
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+components/               # React components
+lib/
+  match/                  # Matching and expiration logic
+  email/                  # Email rendering + sending (Brevo)
+  supabase/               # Supabase client helpers
+  actionLinks.ts          # Signed action link generation & verification
+  cronAuth.ts             # Cron request authentication
+  supabaseAdmin.ts        # Service-role Supabase client
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+.env.example              # Environment variable template
+```
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+---
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+## ⚙️ Environment Variables
 
-## Clone and run locally
+Create a `.env.local` file in the root of the project:
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+```env
+# Update these with your Supabase details from your project settings > API
+# https://app.supabase.com/project/_/settings/api
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-or-anon-key
 
-2. Create a Next.js app using the Supabase Starter template npx command
+# --- Server (required for backend) ---
+SUPABASE_URL=your-supabsae-url
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
+# --- Security ---
+CRON_SECRET=your-cron-secret
+ACTION_LINK_SECRET=your-strong-random-secret
 
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
+# --- Email ---
+BREVO_API_KEY=your-brevo-api-key
 
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
+# --- App ---
+BIBEX_BASE_URL=your-app-url
+```
 
-3. Use `cd` to change into the app's directory
+---
 
-   ```bash
-   cd with-supabase-app
-   ```
+### 🔎 Variable Explanation
 
-4. Rename `.env.example` to `.env.local` and update the following:
+| Variable                               | Purpose                                      |
+| -------------------------------------- | -------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Public Supabase project URL (browser use)    |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Public anon/publishable key                  |
+| `SUPABASE_URL`                         | Supabase project URL (server-side)           |
+| `SUPABASE_SERVICE_ROLE_KEY`            | Service role key (admin access; server-only) |
+| `CRON_SECRET`                          | Required header secret for cron endpoints    |
+| `ACTION_LINK_SECRET`                   | HMAC secret used to sign action links        |
+| `BREVO_API_KEY`                        | API key for sending transactional emails     |
+| `BIBEX_BASE_URL`                       | Base URL for building action links           |
 
-  ```env
-  NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
-  ```
-  > [!NOTE]
-  > This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-  > Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-  > See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
+---
 
-  Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+## 🛠 Local Development
 
-5. You can now run the Next.js local development server:
+### 1. Clone repository
 
-   ```bash
-   npm run dev
-   ```
+```bash
+git clone https://github.com/erezst/bibexchange.git
+cd bibexchange
+```
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+### 2. Install dependencies
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+```bash
+pnpm install
+# or
+npm install
+```
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+### 3. Configure environment
 
-## Feedback and issues
+Create `.env.local` using the template above.
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
+### 4. Run development server
 
-## More Supabase examples
+```bash
+pnpm dev
+# or
+npm run dev
+```
 
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+App runs at:
+
+```
+http://localhost:3000
+```
+
+---
+
+## 🗄 Database (Supabase)
+
+You must create the required tables in Supabase:
+
+Typical tables:
+
+* `events`
+* `buyer_queue`
+* `sellers`
+* `matches`
+* `outbox` (pending emails)
+
+The matching logic in `lib/match/` expects fields such as:
+
+* `status`
+* `match_id`
+* timestamps
+* expiration times
+
+Ensure:
+
+* Row Level Security (RLS) policies are configured
+* Service role key is **never exposed to the client**
+* Only backend code uses `SUPABASE_SERVICE_ROLE_KEY`
+
+---
+
+## ⏰ Cron Endpoints
+
+Located under:
+
+```
+/api/cron/
+```
+
+### Available Jobs
+
+| Endpoint                   | Purpose                   |
+| -------------------------- | ------------------------- |
+| `/api/cron/matchmaker`     | Creates new matches       |
+| `/api/cron/expire-matches` | Expires timed-out matches |
+| `/api/cron/send-emails`    | Sends pending emails      |
+| `/api/cron/tick`           | Combined periodic job     |
+
+All cron endpoints require:
+
+```
+Header: x-cron-secret: <CRON_SECRET>
+```
+
+Without it, they return `401 Unauthorized`.
+
+---
+
+## 🔐 Action Links
+
+Action links are:
+
+* HMAC-signed
+* Time-limited
+* Role-aware (buyer/seller)
+* Built using `ACTION_LINK_SECRET`
+
+They prevent tampering and replay attacks.
+
+Example flow:
+
+1. Match created
+2. Seller receives signed link
+3. Seller confirms transfer
+4. Buyer confirms receipt
+5. Match finalized
+
+---
+
+## 📧 Email (Brevo)
+
+Emails are sent via:
+
+```
+https://api.brevo.com/v3/smtp/email
+```
+
+Configured using:
+
+```
+BREVO_API_KEY
+```
+
+Emails are generated in:
+
+```
+lib/email/render.ts
+```
+
+Queued via:
+
+```
+outbox table
+```
+
+Sent by:
+
+```
+/api/cron/send-emails
+```
+
+---
+
+## 🚀 Deployment (Recommended: Vercel)
+
+### 1. Connect GitHub repo in Vercel
+
+### 2. Add all environment variables in Project Settings
+
+### 3. Configure cron jobs in:
+
+```
+Settings → Cron Jobs
+```
+
+Example:
+
+* Call `/api/cron/tick` every minute
+
+### 4. Deploy
+
+Push to `main` branch → automatic deployment.
+
+---
+
+## 🔒 Security Notes
+
+* Never expose `SUPABASE_SERVICE_ROLE_KEY` in client code.
+* Never prefix sensitive keys with `NEXT_PUBLIC_`.
+* Use long, random values for:
+
+  * `CRON_SECRET`
+  * `ACTION_LINK_SECRET`
+* Ensure email sender domain is verified in Brevo.
+* Enable RLS in Supabase.
+
+---
+
+## 🧠 Architecture Summary
+
+* **Frontend:** Next.js (App Router)
+* **Auth & DB:** Supabase
+* **Email:** Brevo
+* **Matching Engine:** Custom logic in `lib/match`
+* **Security:** HMAC-signed action tokens
+* **Hosting:** Vercel (Serverless)
+
+---
+
+## 📌 Purpose
+
+BibExchange provides a **fair, transparent, queue-based alternative** to chaotic Facebook groups and unsafe direct transfers — helping runners exchange bibs securely and efficiently.
