@@ -50,6 +50,15 @@ export async function updateSession(request: NextRequest) {
   const PUBLIC_PATHS = ["/", "/terms", "/privacy"];
   const pathname = request.nextUrl.pathname;
 
+  // Never redirect API routes or Next internals to /auth/login
+  if (
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico"
+  ) {
+    return supabaseResponse;
+  }
+
   if (
     !PUBLIC_PATHS.includes(pathname) &&
     !user &&
