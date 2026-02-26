@@ -11,10 +11,13 @@ export async function POST(req: NextRequest) {
 
   const sb = supabaseAdmin();
 
-  // 1) Expire old pending matches
+  // 1) Expire / advance match states (new workflow):
+  // - active_intro past intro_deadline_at -> stale_unconfirmed + pause/cooldown
+  // - seller_transferred past buyer_confirm_deadline_at -> auto-complete + finalize queues
+  // - optional reminders scheduling handled inside expirePendingMatches
   const expired = await expirePendingMatches(sb);
 
-  // 2) Create new matches (enqueues proposal emails)
+  // 2) Create new matches (immediate intro emails to buyer + seller)
   const matchmaker = await runMatchmakerOncePerEvent();
 
   // 3) Send email outbox (drain a bit)

@@ -37,6 +37,8 @@ function statusLabel(status: string) {
       return "Waiting";
     case "matched":
       return "Matched";
+    case "paused":
+      return "Paused";
     case "confirmed":
       return "Completed";
     case "expired":
@@ -53,6 +55,7 @@ function statusHint(kind: BibRow["kind"], status: string) {
     return kind === "buying" ? "Waiting for seller" : "Waiting for buyer";
   }
   if (status === "matched") return "Matched — check email";
+  if (status === "paused") return "Paused — resume to get matched";
   if (status === "confirmed") return "Completed";
   if (status === "expired") return "Expired";
   if (status === "cancelled") return "Cancelled";
@@ -112,6 +115,7 @@ export default async function ProtectedContent() {
     if (!user) redirect("/auth/login");
     if (!id || (kind !== "buying" && kind !== "selling")) redirect("/protected");
 
+    // Cancel only while waiting (keeps current MVP behavior)
     if (kind === "buying") {
       await supabase
         .from("buyer_queue")
@@ -125,6 +129,28 @@ export default async function ProtectedContent() {
         .eq("id", id)
         .eq("status", "waiting");
     }
+
+    redirect("/protected");
+  }
+
+  async function resumeBuyerIntent(formData: FormData) {
+    "use server";
+    const id = Number(formData.get("id") || 0);
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) redirect("/auth/login");
+    if (!id) redirect("/protected");
+
+    // Resume only if paused. (Cooldown handling will be added later when schema includes it.)
+    await supabase
+      .from("buyer_queue")
+      .update({ status: "waiting" })
+      .eq("id", id)
+      .eq("status", "paused");
 
     redirect("/protected");
   }
@@ -213,7 +239,7 @@ export default async function ProtectedContent() {
       user_id: user.id,
       event_id: eventId,
       status: "waiting",
-      joined_at: new Date().toISOString(), // ensure set (if db default exists, this is still fine)
+      joined_at: new Date().toISOString(),
     });
 
     if (error) {
@@ -291,7 +317,7 @@ export default async function ProtectedContent() {
         .from("sellers")
         .update({
           status: "waiting",
-          created_at: new Date().toISOString(), // put last in line
+          created_at: new Date().toISOString(),
         })
         .eq("id", oldRow[0].id);
 
@@ -329,7 +355,7 @@ export default async function ProtectedContent() {
     .from("sellers")
     .select("id,status,created_at,events(name,distance_label)")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: false });    
+    .order("created_at", { ascending: false });
 
   if (buyingErr) console.error(buyingErr);
   if (sellingErr) console.error(sellingErr);
@@ -341,13 +367,12 @@ export default async function ProtectedContent() {
 
   if (eventsErr) console.error(eventsErr);
 
-  const eventOptions =
-    (events ?? []).map((e: any) => ({
-      id: String(e.id),
-      name: String(e.name),
-      distance_label: e.distance_label ?? null,
-    }));
-  
+  const eventOptions = (events ?? []).map((e: any) => ({
+    id: String(e.id),
+    name: String(e.name),
+    distance_label: e.distance_label ?? null,
+  }));
+
   const rows: BibRow[] = [
     ...(buying ?? []).map((r: any) => ({
       id: r.id,
@@ -386,15 +411,8 @@ export default async function ProtectedContent() {
                   Start by joining a buyer queue or listing your bib to transfer.
                 </p>
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                  <JoinBuyerDialog
-                    events={eventOptions}
-                    joinBuyerAction={joinBuyerQueue}
-                  />
-
-                  <ListSellerDialog
-                    events={eventOptions}
-                    listSellerAction={listMyBib}
-                  />
+                  <JoinBuyerDialog events={eventOptions} joinBuyerAction={joinBuyerQueue} />
+                  <ListSellerDialog events={eventOptions} listSellerAction={listMyBib} />
                 </div>
               </CardContent>
             </Card>
@@ -416,22 +434,22 @@ export default async function ProtectedContent() {
                       <TableBody>
                         {rows.map((row) => (
                           <TableRow key={`${row.kind}-${row.id}`}>
-                            <TableCell className="font-medium">
-                              {row.raceName}
-                            </TableCell>
+                            <TableCell className="font-medium">{row.raceName}</TableCell>
                             <TableCell>{row.distanceLabel}</TableCell>
                             <TableCell>
                               <KindBadge kind={row.kind} />
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <StatusBadge
-                                  text={statusHint(row.kind, row.status)}
-                                />
+                                <StatusBadge text={statusHint(row.kind, row.status)} />
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              <RowMenu row={row} cancelAction={cancelIntent} />
+                              <RowMenu
+                                row={row}
+                                cancelAction={cancelIntent}
+                                resumeBuyerAction={resumeBuyerIntent}
+                              />
                             </TableCell>
                           </TableRow>
                         ))}
@@ -453,13 +471,15 @@ export default async function ProtectedContent() {
                           </div>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <KindBadge kind={row.kind} />
-                            <StatusBadge
-                              text={statusHint(row.kind, row.status)}
-                            />
+                            <StatusBadge text={statusHint(row.kind, row.status)} />
                           </div>
                         </div>
 
-                        <RowMenu row={row} cancelAction={cancelIntent} />
+                        <RowMenu
+                          row={row}
+                          cancelAction={cancelIntent}
+                          resumeBuyerAction={resumeBuyerIntent}
+                        />
                       </div>
                     </CardContent>
                   </Card>
@@ -475,14 +495,10 @@ export default async function ProtectedContent() {
               <div className="text-3xl">🛒</div>
               <div className="mt-3 text-xl font-semibold">Buy</div>
               <p className="mt-2 text-sm text-muted-foreground">
-                Join the queue for a race and get matched fairly — first come,
-                first served.
+                Join the queue for a race and get matched fairly — first come, first served.
               </p>
               <div className="mt-5">
-                <JoinBuyerDialog
-                  events={eventOptions}
-                  joinBuyerAction={joinBuyerQueue}
-                />
+                <JoinBuyerDialog events={eventOptions} joinBuyerAction={joinBuyerQueue} />
               </div>
             </CardContent>
           </Card>
@@ -492,14 +508,10 @@ export default async function ProtectedContent() {
               <div className="text-3xl">🎟️</div>
               <div className="mt-3 text-xl font-semibold">Sell</div>
               <p className="mt-2 text-sm text-muted-foreground">
-                List your transfer intent and we’ll match you with the next
-                buyer automatically.
+                List your transfer intent and we’ll match you with the next buyer automatically.
               </p>
               <div className="mt-5">
-                <ListSellerDialog
-                  events={eventOptions}
-                  listSellerAction={listMyBib}
-                />
+                <ListSellerDialog events={eventOptions} listSellerAction={listMyBib} />
               </div>
             </CardContent>
           </Card>
@@ -512,11 +524,16 @@ export default async function ProtectedContent() {
 function RowMenu({
   row,
   cancelAction,
+  resumeBuyerAction,
 }: {
   row: BibRow;
   cancelAction: (formData: FormData) => Promise<void>;
+  resumeBuyerAction: (formData: FormData) => Promise<void>;
 }) {
   const canCancel = row.status === "waiting";
+
+  const showResume = row.kind === "buying" && row.status === "paused";
+  const canResume = showResume;
 
   return (
     <DropdownMenu>
@@ -533,14 +550,36 @@ function RowMenu({
           <DropdownMenuItem asChild>
             <button
               type="submit"
-              className="w-full text-left"
+              className={[
+                "w-full text-left",
+                !canCancel ? "opacity-50 cursor-not-allowed" : "",
+              ].join(" ")}
               disabled={!canCancel}
-              title={canCancel ? "Cancel this request" : "Can only cancel while Waiting (MVP)"}
+              title={canCancel ? "Cancel this request" : "Can only cancel while Waiting"}
             >
               Cancel
             </button>
           </DropdownMenuItem>
         </form>
+
+        {showResume && (
+          <form action={resumeBuyerAction}>
+            <input type="hidden" name="id" value={row.id} />
+            <DropdownMenuItem asChild>
+              <button
+                type="submit"
+                className={[
+                  "w-full text-left",
+                  !canResume ? "opacity-50 cursor-not-allowed" : "",
+                ].join(" ")}
+                disabled={!canResume}
+                title={canResume ? "Resume and become eligible for matching" : "Not applicable"}
+              >
+                Resume
+              </button>
+            </DropdownMenuItem>
+          </form>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
